@@ -1,118 +1,168 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Networking;
 
-public class PlayerController : NetworkBehaviour
+namespace Assets.Scripts.Controller
 {
-    public float WalkSpeed;
-    public float RunSpeed;
-
-    [SyncVar] public Position2 Position;
-
-    void Awake()
+    public class PlayerController : NetworkBehaviour
     {
-        InitState();
-    }
+        readonly float easing = 0.1f;
 
-    [Server]
-    private void InitState()
-    {
-        Position = new Position2
+        readonly float spacing = 1.0f;
+
+        private Animator animator;
+
+        [SyncVar] Color color;
+
+        Queue<KeyCode> pendingMoves;
+        CharacterState predictedState;
+        public float RunSpeed = 0.8f;
+
+        [SyncVar(hook = "OnServerStateChanged")] CharacterState serverState;
+        public float WalkSpeed = 0.3f;
+
+        public void Start()
         {
-            x = transform.position.x,
-            y = transform.position.y
-        };
-    }
-
-    private Animator animator;
-    
-    public enum Direction
-    {
-        South = 0,
-        West = 1,
-        North = 2,
-        East = 3
-    }
-
-    void Update()
-    {
-        if (isLocalPlayer)
-        {
-            HandleInputs();
-        }
-        SyncState();
-    }
-
-    void HandleInputs()
-    {
-        KeyCode[] arrowKeys = {KeyCode.Z, KeyCode.Q, KeyCode.S, KeyCode.D};
-        bool walk = Input.GetKey(KeyCode.LeftShift);
-        foreach (KeyCode arrowKey in arrowKeys)
-        {
-            if (!Input.GetKey(arrowKey)) continue;
-            
-            // ask real move on server.
-            CmdMoveOnServer(arrowKey, walk);
-        }
-    }
-
-    [Command]
-    void CmdMoveOnServer(KeyCode arrowKey, bool walk)
-    {
-        Position = Move(Position, arrowKey, walk);
-    }
-
-    Position2 Move(Position2 previous, KeyCode arrowKey, bool walk)
-    {
-        
-        float horizontalDisplacement = 0f;
-        float verticalDisplacement = 0f;
-        var direction = Direction.South;
-        switch (arrowKey)
-        {
-            case KeyCode.Z:
-                verticalDisplacement = 1;
-                direction = Direction.North;
-                break;
-            case KeyCode.S:
-                verticalDisplacement = -1;
-                direction = Direction.South;
-                break;
-            case KeyCode.Q:
-                horizontalDisplacement = -1;
-                direction = Direction.West;
-                break;
-            case KeyCode.D:
-                horizontalDisplacement = 1;
-                direction = Direction.East;
-                break;
+            if (isLocalPlayer)
+            {
+                pendingMoves = new Queue<KeyCode>();
+                UpdatePredictedState();
+            }
+            SyncState(true);
+            SyncColor();
         }
 
-        var speed = walk ? WalkSpeed : RunSpeed;
-
-        return new Position2
+        public void Awake()
         {
-            x = previous.x + horizontalDisplacement * speed * Time.deltaTime,
-            y = previous.y + verticalDisplacement * speed * Time.deltaTime,
-            direction = direction
-        };
-    }
+            InitState();
+        }
 
-    void SyncState()
-    {
-        transform.position = new Vector2(Position.x, Position.y);
+        [Server]
+        private void InitState()
+        {
+            Color[] colors = {Color.blue, Color.cyan, Color.green, Color.magenta, Color.red, Color.yellow};
+            color = colors[Random.Range(0, colors.Length)];
+            serverState = new CharacterState
+            {
+                StateIndex = 0,
+                X = transform.position.x,
+                Y = transform.position.y
+            };
+        }
 
-        if (animator == null)
-            animator = this.GetComponent<Animator>();
+        public void Update()
+        {
+            if (isLocalPlayer)
+            {
+                HandleInputs();
+            }
+            SyncState(false);
+        }
 
-        if (animator != null)
-            animator.SetInteger("Direction", (int)Position.direction);
+        private void UpdatePredictedState()
+        {
+            predictedState = serverState;
+            foreach (var arrowKey in pendingMoves)
+            {
+                predictedState = Move(predictedState, arrowKey, predictedState.Walk);
+            }
+        }
+
+        private void HandleInputs()
+        {
+            KeyCode[] arrowKeys = {KeyCode.Z, KeyCode.Q, KeyCode.S, KeyCode.D};
+            var walk = Input.GetKey(KeyCode.LeftShift);
+            foreach (var arrowKey in arrowKeys)
+            {
+                if (!Input.GetKey(arrowKey)) continue;
+
+                pendingMoves.Enqueue(arrowKey);
+                UpdatePredictedState();
+                CmdMoveOnServer(arrowKey, walk);
+            }
+        }
+
+        [Command]
+        public void CmdMoveOnServer(KeyCode arrowKey, bool walk)
+        {
+            serverState = Move(serverState, arrowKey, walk);
+        }
+
+        private CharacterState Move(CharacterState previous, KeyCode arrowKey, bool walk)
+        {
+            var horizontalDisplacement = 0f;
+            var verticalDisplacement = 0f;
+            var direction = CardinalDirection.South;
+            var idle = true;
+            switch (arrowKey)
+            {
+                case KeyCode.Z:
+                    verticalDisplacement = 1;
+                    direction = CardinalDirection.North;
+                    idle = false;
+                    break;
+                case KeyCode.S:
+                    verticalDisplacement = -1;
+                    direction = CardinalDirection.South;
+                    idle = false;
+                    break;
+                case KeyCode.Q:
+                    horizontalDisplacement = -1;
+                    direction = CardinalDirection.West;
+                    idle = false;
+                    break;
+                case KeyCode.D:
+                    horizontalDisplacement = 1;
+                    direction = CardinalDirection.East;
+                    idle = false;
+                    break;
+            }
+
+            var speed = walk ? WalkSpeed : RunSpeed;
+
+            return new CharacterState
+            {
+                StateIndex = 1 + previous.StateIndex,
+                X = previous.X + horizontalDisplacement * speed * Time.deltaTime,
+                Y = previous.Y + verticalDisplacement * speed * Time.deltaTime,
+                Direction = direction,
+                Idle = idle,
+                Walk = walk
+            };
+        }
+
+        public void OnServerStateChanged(CharacterState newState)
+        {
+            serverState = newState;
+            if (pendingMoves != null)
+            {
+                while (pendingMoves.Count > predictedState.StateIndex - serverState.StateIndex)
+                {
+                    pendingMoves.Dequeue();
+                }
+                UpdatePredictedState();
+            }
+        }
+
+        private void SyncColor()
+        {
+            GetComponent<Renderer>().material.color = (isLocalPlayer ? Color.white : Color.grey) * color;
+        }
+
+        void SyncState(bool init)
+        {
+            var stateToRender = isLocalPlayer ? predictedState : serverState;
+            var target = spacing * (stateToRender.X * Vector3.right + stateToRender.Y * Vector3.up);
+            transform.position = init ? target : Vector3.Lerp(transform.position, target, easing);
+
+            if (animator == null)
+                animator = GetComponent<Animator>();
+
+            if (animator != null)
+            {
+                animator.SetInteger("Direction", (int) stateToRender.Direction);
+                animator.SetBool("Idle", stateToRender.Idle);
+            }
+        }
     }
 }
-
-public struct Position2
-{
-    public float x;
-    public float y;
-    public PlayerController.Direction direction;
-}
-
