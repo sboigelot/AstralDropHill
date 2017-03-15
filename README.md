@@ -1,7 +1,4 @@
-# AstralDropHill
-
-
-# AstralDropHill [![Build Status](https://travis-ci.org/sboigelot/AstralDropHill.svg)](https://travis-ci.org/sboigelot/AstralDropHill)
+# AstralDropHill "AstroDrop" [![Build Status](https://travis-ci.org/sboigelot/AstralDropHill.svg)](https://travis-ci.org/sboigelot/AstralDropHill)
 
 [About](#about)
 [Copyright & Licensing](#copyright--licensing)  
