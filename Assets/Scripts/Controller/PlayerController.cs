@@ -123,6 +123,7 @@ namespace Assets.Scripts.Controller
 
             return new CharacterState
             {
+                //StateIndex = arrowKey == KeyCode.F1 ? previous.StateIndex : 1 + previous.StateIndex,
                 StateIndex = 1 + previous.StateIndex,
                 //DestinationX = previous.DestinationX + horizontalDisplacement * speed * Time.deltaTime,
                 //DestinationY = previous.DestinationY + verticalDisplacement * speed * Time.deltaTime,
@@ -154,8 +155,12 @@ namespace Assets.Scripts.Controller
 
         void SyncState()
         {
-            var stateToRender = isLocalPlayer ? predictedState : serverState;
-
+            var stateToRender = isLocalPlayer 
+                //||
+                //                serverState.StateIndex == predictedState.StateIndex 
+                ? predictedState
+                : serverState;
+            
             animator.SetBool("IsMoving", !stateToRender.Idle);
 
             if (stateToRender.Idle)
@@ -175,20 +180,21 @@ namespace Assets.Scripts.Controller
             //animator.SetFloat("MoveY", direction.y);
             //rigidbody2d.MovePosition(new Vector2(stateToRender.DestinationX, stateToRender.DestinationY));
 
+            var targetPos = new Vector2(stateToRender.DestinationX, stateToRender.DestinationY);
+            var distance = Vector2.Distance(targetPos, transform.position);
+            //Debug.Log(distance);
+            if (distance > 1)
+            {
+                Debug.Log("Should teleport: distance: " + distance);
+                transform.position = targetPos;
+            }
+
             Vector2 velocity = new Vector2(
                 stateToRender.DestinationX - transform.position.x,
                 stateToRender.DestinationY - transform.position.y);
             animator.SetFloat("MoveX", velocity.x);
             animator.SetFloat("MoveY", velocity.y);
-
-            //if (velocity.magnitude > 1f) //reconcile with server version
-            //{
-            //    transform.position = new Vector2(stateToRender.DestinationX, stateToRender.DestinationY);
-            //}
-            //else
-            //{
-                rigidbody2d.velocity = velocity;
-            //}
+            rigidbody2d.velocity = velocity;
 
 
 
