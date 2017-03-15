@@ -1,17 +1,17 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
+using Random = UnityEngine.Random;
 
 namespace Assets.Scripts.Controller
 {
     public class PlayerController : NetworkBehaviour
     {
-        readonly float easing = 0.1f;
-
-        readonly float spacing = 1.0f;
-
         private Animator animator;
 
+        private Rigidbody2D rigidbody2d;
+        
         [SyncVar] Color color;
 
         Queue<KeyCode> pendingMoves;
@@ -23,12 +23,15 @@ namespace Assets.Scripts.Controller
 
         public void Start()
         {
+            rigidbody2d = GetComponent<Rigidbody2D>();
+            animator = GetComponent<Animator>();
+
             if (isLocalPlayer)
             {
                 pendingMoves = new Queue<KeyCode>();
                 UpdatePredictedState();
             }
-            SyncState(true);
+            SyncState();
             SyncColor();
         }
 
@@ -44,9 +47,7 @@ namespace Assets.Scripts.Controller
             color = colors[Random.Range(0, colors.Length)];
             serverState = new CharacterState
             {
-                StateIndex = 0,
-                X = transform.position.x,
-                Y = transform.position.y
+                StateIndex = 0
             };
         }
 
@@ -56,7 +57,7 @@ namespace Assets.Scripts.Controller
             {
                 HandleInputs();
             }
-            SyncState(false);
+            SyncState();
         }
 
         private void UpdatePredictedState()
@@ -72,14 +73,16 @@ namespace Assets.Scripts.Controller
         {
             KeyCode[] arrowKeys = {KeyCode.Z, KeyCode.Q, KeyCode.S, KeyCode.D};
             var walk = Input.GetKey(KeyCode.LeftShift);
+            pendingMoves.Enqueue(KeyCode.F1);
+            CmdMoveOnServer(KeyCode.F1, walk);
             foreach (var arrowKey in arrowKeys)
             {
                 if (!Input.GetKey(arrowKey)) continue;
 
                 pendingMoves.Enqueue(arrowKey);
-                UpdatePredictedState();
                 CmdMoveOnServer(arrowKey, walk);
             }
+            UpdatePredictedState();
         }
 
         [Command]
@@ -92,29 +95,27 @@ namespace Assets.Scripts.Controller
         {
             var horizontalDisplacement = 0f;
             var verticalDisplacement = 0f;
-            var direction = CardinalDirection.South;
             var idle = true;
             switch (arrowKey)
             {
                 case KeyCode.Z:
                     verticalDisplacement = 1;
-                    direction = CardinalDirection.North;
                     idle = false;
                     break;
                 case KeyCode.S:
                     verticalDisplacement = -1;
-                    direction = CardinalDirection.South;
                     idle = false;
                     break;
                 case KeyCode.Q:
                     horizontalDisplacement = -1;
-                    direction = CardinalDirection.West;
                     idle = false;
                     break;
                 case KeyCode.D:
                     horizontalDisplacement = 1;
-                    direction = CardinalDirection.East;
                     idle = false;
+                    break;
+                case KeyCode.F1:
+                    idle = true;
                     break;
             }
 
@@ -123,9 +124,10 @@ namespace Assets.Scripts.Controller
             return new CharacterState
             {
                 StateIndex = 1 + previous.StateIndex,
-                X = previous.X + horizontalDisplacement * speed * Time.deltaTime,
-                Y = previous.Y + verticalDisplacement * speed * Time.deltaTime,
-                Direction = direction,
+                //DestinationX = previous.DestinationX + horizontalDisplacement * speed * Time.deltaTime,
+                //DestinationY = previous.DestinationY + verticalDisplacement * speed * Time.deltaTime,
+                DestinationX = transform.position.x + horizontalDisplacement * speed * Time.deltaTime,
+                DestinationY = transform.position.y + verticalDisplacement * speed * Time.deltaTime,
                 Idle = idle,
                 Walk = walk
             };
@@ -136,7 +138,8 @@ namespace Assets.Scripts.Controller
             serverState = newState;
             if (pendingMoves != null)
             {
-                while (pendingMoves.Count > predictedState.StateIndex - serverState.StateIndex)
+                while (pendingMoves.Count > 0 &&
+                        pendingMoves.Count > predictedState.StateIndex - serverState.StateIndex)
                 {
                     pendingMoves.Dequeue();
                 }
@@ -146,23 +149,64 @@ namespace Assets.Scripts.Controller
 
         private void SyncColor()
         {
-            GetComponent<Renderer>().material.color = (isLocalPlayer ? Color.white : Color.grey) * color;
+            //GetComponent<Renderer>().material.color = (isLocalPlayer ? Color.white : Color.grey) * color;
         }
 
-        void SyncState(bool init)
+        void SyncState()
         {
             var stateToRender = isLocalPlayer ? predictedState : serverState;
-            var target = spacing * (stateToRender.X * Vector3.right + stateToRender.Y * Vector3.up);
-            transform.position = init ? target : Vector3.Lerp(transform.position, target, easing);
 
-            if (animator == null)
-                animator = GetComponent<Animator>();
+            animator.SetBool("IsMoving", !stateToRender.Idle);
 
-            if (animator != null)
+            if (stateToRender.Idle)
             {
-                animator.SetInteger("Direction", (int) stateToRender.Direction);
-                animator.SetBool("Idle", stateToRender.Idle);
+                //rigidbody2d.velocity = Vector2.zero;
             }
+            else
+            {
+                animator.SetFloat("LastMoveX", animator.GetFloat("MoveX"));
+                animator.SetFloat("LastMoveY", animator.GetFloat("MoveY"));
+            }
+
+            //Vector2 direction = new Vector2(
+            //    stateToRender.DestinationX - transform.position.x,
+            //    stateToRender.DestinationY - transform.position.y).normalized;
+            //animator.SetFloat("MoveX", direction.x);
+            //animator.SetFloat("MoveY", direction.y);
+            //rigidbody2d.MovePosition(new Vector2(stateToRender.DestinationX, stateToRender.DestinationY));
+
+            Vector2 velocity = new Vector2(
+                stateToRender.DestinationX - transform.position.x,
+                stateToRender.DestinationY - transform.position.y);
+            animator.SetFloat("MoveX", velocity.x);
+            animator.SetFloat("MoveY", velocity.y);
+
+            //if (velocity.magnitude > 1f) //reconcile with server version
+            //{
+            //    transform.position = new Vector2(stateToRender.DestinationX, stateToRender.DestinationY);
+            //}
+            //else
+            //{
+                rigidbody2d.velocity = velocity;
+            //}
+
+
+
+            //Vector2 distance = new Vector2(
+            //    stateToRender.DestinationX - transform.position.x,
+            //    stateToRender.DestinationY - transform.position.y);
+            //animator.SetFloat("MoveX", distance.normalized.x);
+            //animator.SetFloat("MoveY", distance.normalized.y);
+            //var destination = new Vector2(stateToRender.DestinationX, stateToRender.DestinationY);
+
+            //if (distance.magnitude > RunSpeed * 10) //reconcile with server version
+            //{
+            //    transform.position = destination;
+            //}
+            //else
+            //{
+            //rigidbody2d.MovePosition(velocity);
+            //}
         }
     }
 }
