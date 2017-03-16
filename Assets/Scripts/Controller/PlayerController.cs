@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
-using Random = UnityEngine.Random;
 
 namespace Assets.Scripts.Controller
 {
@@ -10,12 +8,12 @@ namespace Assets.Scripts.Controller
     {
         private Animator animator;
 
-        private Rigidbody2D rigidbody2d;
-        
         [SyncVar] Color color;
 
         Queue<KeyCode> pendingMoves;
         CharacterState predictedState;
+
+        private Rigidbody2D rigidbody2d;
         public float RunSpeed = 0.8f;
 
         [SyncVar(hook = "OnServerStateChanged")] CharacterState serverState;
@@ -30,6 +28,9 @@ namespace Assets.Scripts.Controller
             {
                 pendingMoves = new Queue<KeyCode>();
                 UpdatePredictedState();
+
+                var cameraController = Camera.main.GetComponent<CameraController>();
+                cameraController.Target = gameObject;
             }
             SyncState();
             SyncColor();
@@ -140,7 +141,7 @@ namespace Assets.Scripts.Controller
             if (pendingMoves != null)
             {
                 while (pendingMoves.Count > 0 &&
-                        pendingMoves.Count > predictedState.StateIndex - serverState.StateIndex)
+                       pendingMoves.Count > predictedState.StateIndex - serverState.StateIndex)
                 {
                     pendingMoves.Dequeue();
                 }
@@ -155,12 +156,12 @@ namespace Assets.Scripts.Controller
 
         void SyncState()
         {
-            var stateToRender = isLocalPlayer 
+            var stateToRender = isLocalPlayer
                 //||
                 //                serverState.StateIndex == predictedState.StateIndex 
                 ? predictedState
                 : serverState;
-            
+
             animator.SetBool("IsMoving", !stateToRender.Idle);
 
             if (stateToRender.Idle)
@@ -183,19 +184,18 @@ namespace Assets.Scripts.Controller
             var targetPos = new Vector2(stateToRender.DestinationX, stateToRender.DestinationY);
             var distance = Vector2.Distance(targetPos, transform.position);
             //Debug.Log(distance);
-            if (distance > 1)
-            {
-                Debug.Log("Should teleport: distance: " + distance);
-                transform.position = targetPos;
-            }
+            //if (distance > 1)
+            //{
+            //    Debug.Log("Should teleport: distance: " + distance);
+            //    //transform.position = targetPos;
+            //}
 
-            Vector2 velocity = new Vector2(
+            var velocity = new Vector2(
                 stateToRender.DestinationX - transform.position.x,
                 stateToRender.DestinationY - transform.position.y);
             animator.SetFloat("MoveX", velocity.x);
             animator.SetFloat("MoveY", velocity.y);
             rigidbody2d.velocity = velocity;
-
 
 
             //Vector2 distance = new Vector2(

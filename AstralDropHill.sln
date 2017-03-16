@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2015
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AstralDropHill", "AstralDropHill.csproj", "{EBBC6664-0550-5AA2-27B7-959A29A2CE17}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AstralDropHill.Editor", "AstralDropHill.Editor.csproj", "{E3E6595A-0212-99F7-9BDD-715FAFE723E1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -13,6 +15,10 @@ Global
 		{EBBC6664-0550-5AA2-27B7-959A29A2CE17}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EBBC6664-0550-5AA2-27B7-959A29A2CE17}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EBBC6664-0550-5AA2-27B7-959A29A2CE17}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3E6595A-0212-99F7-9BDD-715FAFE723E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3E6595A-0212-99F7-9BDD-715FAFE723E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3E6595A-0212-99F7-9BDD-715FAFE723E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3E6595A-0212-99F7-9BDD-715FAFE723E1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

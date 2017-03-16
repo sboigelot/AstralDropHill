@@ -11,7 +11,9 @@
         public float AttackTime;
 
         public bool Walk;
+
         public float DestinationX;
+
         public float DestinationY;
     }
 }
