@@ -72,7 +72,7 @@ namespace Assets.Scripts.Controller
 
         private void HandleInputs()
         {
-            KeyCode[] arrowKeys = {KeyCode.Z, KeyCode.Q, KeyCode.S, KeyCode.D};
+            KeyCode[] arrowKeys = {KeyCode.Z, KeyCode.Q, KeyCode.S, KeyCode.D, KeyCode.Space};
             var walk = Input.GetKey(KeyCode.LeftShift);
             pendingMoves.Enqueue(KeyCode.F1);
             CmdMoveOnServer(KeyCode.F1, walk);
@@ -131,7 +131,8 @@ namespace Assets.Scripts.Controller
                 DestinationX = transform.position.x + horizontalDisplacement * speed * Time.deltaTime,
                 DestinationY = transform.position.y + verticalDisplacement * speed * Time.deltaTime,
                 Idle = idle,
-                Walk = walk
+                Walk = walk,
+                Attack = arrowKey == KeyCode.Space
             };
         }
 
@@ -162,7 +163,8 @@ namespace Assets.Scripts.Controller
                 ? predictedState
                 : serverState;
 
-            animator.SetBool("IsMoving", !stateToRender.Idle);
+            animator.SetBool("IsMoving", !stateToRender.Idle && !stateToRender.Attack);
+            animator.SetBool("IsAttacking", stateToRender.Attack);
 
             if (stateToRender.Idle)
             {

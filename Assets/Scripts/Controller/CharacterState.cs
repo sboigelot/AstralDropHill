@@ -6,9 +6,9 @@
         
         public bool Idle;
 
-        public float JumpTime;
+        public bool Jump;
 
-        public float AttackTime;
+        public bool Attack;
 
         public bool Walk;
 
